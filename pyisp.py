@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
+#when you are on 64-bit Windows, MS64\dll\libusb-1.0.dll must be copied into C:\Windows\System32 and 
+#for running 32-bit applications that use libusb) MS32\dll\libusb-1.0.dll must be copied into C:\Windows\SysWOW64. 
 
 # Form implementation generated from reading ui file 'c:\pp\pyt1.ui'
 #
 # Created by: PyQt5 UI code generator 5.10.1
 #
 # WARNING! All changes made in this file will be lost!
-
+from usb.backend import libusb1
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtWidgets import QApplication , QMainWindow
 from PyQt5.QtGui import QPainter, QColor, QPen
@@ -18,6 +20,9 @@ import usb.util
 import struct
 import sys
 import time
+import os
+import platform
+
 
 class ISP_USB:
       AP_FILE=[]
@@ -34,6 +39,10 @@ class ISP_USB:
             # was it found?
             if self.dev is None:
                 raise ValueError('USB Device not found')
+            #linux
+            if(platform.system()=="linux"):
+                if self.dev.is_kernel_driver_active(0): 
+                   self.dev.detach_kernel_driver(0)
             self.dev.set_configuration()
             usb.util.claim_interface(self.dev, 0)
             self.dev.reset()
@@ -57,7 +66,7 @@ class ISP_USB:
             
 
             test=self.dev.write(0x02,thelist)            
-            return_str=self.ep_in.read(0x81,64) #return by string
+            return_str=self.dev.read(0x81,64,1000) #return by string
             return_buffer=bytearray(return_str)
  #print 'rx package'
  #print '[{}]'.format(', '.join(hex(x) for x in return_buffer))
@@ -151,7 +160,7 @@ class ISP_USB:
             thelist[7]=PN>>24&0xff
             test=self.dev.write(0x02,thelist)
             time.sleep(5)
-            return_str=self.ep_in.read(0x81,64) #return by string
+            return_str=self.dev.read(0x81,64,1000) #return by string
             return_buffer=bytearray(return_str)
  #print 'rx package'
  #print '[{}]'.format(', '.join(hex(x) for x in return_buffer))
@@ -333,12 +342,14 @@ class Worker(QThread):
                         PAP1_COMMNAD.append(0xFF)          
                         #print '[{}]'.format(', '.join(hex(x) for x in PAP1_COMMNAD)) 
                 if (((AP_SIZE-i)<56) or ((AP_SIZE-i)==56)):
-                    #print "end"    
+                    #print("end")    
                     buf=self.ISP.USB_TRANSFER(PAP1_COMMNAD,self.ISP.PacketNumber)
-                    d_checksum=buf[8]|buf[9]<<8
-                    if(d_checksum==(self.ISP.AP_CHECKSUM&0xffff)):
-                        #print("checksum pass")
-                        self.sinOut.emit("100")
+                    #d_checksum=buf[8]|buf[9]<<8
+                    #print(hex(d_checksum))
+                    #print(self.ISP.AP_CHECKSUM&0xffff)
+                    #if(d_checksum==(self.ISP.AP_CHECKSUM&0xffff)):
+                    #    print("checksum pass")
+                    self.sinOut.emit("100")
                 else:
                         #print "loop"     
                     self.ISP.USB_TRANSFER(PAP1_COMMNAD,self.ISP.PacketNumber)
